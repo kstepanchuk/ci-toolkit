@@ -653,7 +653,7 @@ jobs:
           test -n "$APP"
           mkdir -p ipa/Payload && cp -R "$APP" ipa/Payload/
           (cd ipa && zip -qry ../sdodesk-ios-aarch64.ipa Payload)
-          ls -la SDOdesk-*.ipa
+          ls -la sdodesk-ios-aarch64.ipa
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
