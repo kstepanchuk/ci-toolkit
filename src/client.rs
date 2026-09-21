@@ -426,7 +426,7 @@ impl Client {
             NatType::from_i32(my_nat_type).unwrap_or(NatType::UNKNOWN_NAT)
         };
 
-        if !key.is_empty() && !token.is_empty() {
+        if false /* SDOdesk: hbbs OSS has no secure tcp */ {
             // mainly for the security of token
             secure_tcp(&mut socket, &key)
                 .await
@@ -461,7 +461,7 @@ impl Client {
         let punch_type = if udp_nat_port > 0 { "UDP" } else { "TCP" };
         msg_out.set_punch_hole_request(PunchHoleRequest {
             id: peer.to_owned(),
-            token: token.to_owned(),
+            token: "".to_owned(), // SDOdesk: never send the account token to hbbs
             nat_type: nat_type.into(),
             licence_key: key.to_owned(),
             conn_type: conn_type.into(),
@@ -855,7 +855,7 @@ impl Client {
                 .await
                 .with_context(|| "Failed to connect to rendezvous server")?;
 
-            if !key.is_empty() && !token.is_empty() {
+            if false /* SDOdesk: hbbs OSS has no secure tcp */ {
                 // mainly for the security of token
                 secure_tcp(&mut socket, key).await?;
             }
@@ -873,7 +873,7 @@ impl Client {
             );
             msg_out.set_request_relay(RequestRelay {
                 id: peer.to_owned(),
-                token: token.to_owned(),
+                token: "".to_owned(), // SDOdesk: never send the account token to hbbs
                 uuid: uuid.clone(),
                 relay_server: relay_server.clone(),
                 secure,
@@ -4023,6 +4023,7 @@ async fn hc_connection_(
     mut rx: UnboundedReceiver<()>,
     token: String,
 ) -> ResultType<()> {
+    return Ok(()); // SDOdesk: HealthCheck needs secure tcp + sends the token; not supported by hbbs OSS
     let mut timer = crate::rustdesk_interval(interval(crate::TIMER_OUT));
     let mut last_recv_msg = Instant::now();
     let mut keep_alive = crate::DEFAULT_KEEP_ALIVE;
