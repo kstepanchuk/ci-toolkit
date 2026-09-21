@@ -1,0 +1,42 @@
+name: Build server (hbbs, Windows)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  hbbs:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Fetch rustdesk-server 1.1.16
+        shell: bash
+        run: git clone --depth 1 --branch 1.1.16 --recurse-submodules --shallow-submodules https://github.com/rustdesk/rustdesk-server.git rds
+
+      - name: Apply the SDOdesk ticket patch
+        shell: bash
+        run: python3 server/hbbs/apply_patch.py rds
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
+
+      - name: Unit tests (ticket verification, HMAC vectors)
+        shell: bash
+        working-directory: rds
+        run: cargo test --lib sdo_ticket -- --nocapture
+
+      - name: Build hbbs and hbbr
+        shell: bash
+        working-directory: rds
+        run: cargo build --release
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sdodesk-server-windows-x86_64
+          path: |
+            rds/target/release/hbbs.exe
+            rds/target/release/hbbr.exe
