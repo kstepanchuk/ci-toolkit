@@ -312,6 +312,8 @@ impl Client {
             crate::test_ipv6().await;
         }
 
+        // SDOdesk: hbbs refuses connection requests that carry no valid ticket for a logged-in user.
+        let token = sdo_fetch_ticket().await?;
         let (stop_udp_tx, stop_udp_rx) = oneshot::channel::<()>();
         let udp =
         // no need to care about multiple rendezvous servers case, since it is acutally not used any more.
@@ -461,7 +463,7 @@ impl Client {
         let punch_type = if udp_nat_port > 0 { "UDP" } else { "TCP" };
         msg_out.set_punch_hole_request(PunchHoleRequest {
             id: peer.to_owned(),
-            token: "".to_owned(), // SDOdesk: never send the account token to hbbs
+            token: token.to_owned(),
             nat_type: nat_type.into(),
             licence_key: key.to_owned(),
             conn_type: conn_type.into(),
@@ -873,7 +875,7 @@ impl Client {
             );
             msg_out.set_request_relay(RequestRelay {
                 id: peer.to_owned(),
-                token: "".to_owned(), // SDOdesk: never send the account token to hbbs
+                token: token.to_owned(),
                 uuid: uuid.clone(),
                 relay_server: relay_server.clone(),
                 secure,
@@ -4325,4 +4327,27 @@ async fn udp_nat_connect(
             anyhow!(err)
         })?;
     Ok((res.1, Some(res.0), typ))
+}
+
+/// SDOdesk: fetch a short-lived connection ticket (signed by the API, checked offline by hbbs).
+async fn sdo_fetch_ticket() -> ResultType<String> {
+    let access_token = LocalConfig::get_option("access_token");
+    if access_token.is_empty() {
+        bail!("SDOdesk: sign in to your account first");
+    }
+    let api = crate::ui_interface::get_api_server();
+    if api.is_empty() {
+        bail!("SDOdesk: API server is not configured");
+    }
+    let header = serde_json::json!({ "Authorization": format!("Bearer {}", access_token) }).to_string();
+    let body = crate::post_request(format!("{}/api/sdo/ticket", api), "{}".to_owned(), &header).await?;
+    let v: serde_json::Value =
+        serde_json::from_str(&body).map_err(|_| anyhow!("SDOdesk: unexpected ticket response"))?;
+    match v.get("ticket").and_then(|t| t.as_str()) {
+        Some(t) if !t.is_empty() => Ok(t.to_owned()),
+        _ => bail!(
+            "SDOdesk: access denied ({})",
+            v.get("error").and_then(|e| e.as_str()).unwrap_or("sign in again")
+        ),
+    }
 }
