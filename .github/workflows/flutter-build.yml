@@ -350,7 +350,7 @@ jobs:
         run: |
           pushd ./res/msi
           mv ../../rustdesk/rustdesk.exe ../../rustdesk/SDOdesk.exe
-          python preprocess.py --arp -d ../../rustdesk --app-name SDOdesk -v ${{ env.VERSION }} -m "${{ secrets.SDO_COMPANY }}"
+          python preprocess.py --arp -d ../../rustdesk --app-name SDOdesk -v ${{ env.VERSION }} -m "SDOdesk"
           nuget restore msi.sln
           $msiPlatform = if ('${{ matrix.job.arch }}' -eq 'aarch64') { 'ARM64' } else { 'x64' }
           msbuild msi.sln -p:Configuration=Release -p:Platform=$msiPlatform /p:TargetVersion=Windows10
@@ -644,6 +644,31 @@ jobs:
           # flutter build ipa --release --obfuscate --split-debug-info=./split-debug-info --no-codesign
           # for easy debugging
           flutter build ipa --release --no-codesign
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          APP=$(find flutter/build/ios/archive -maxdepth 5 -name "*.app" -path "*Products/Applications*" | head -1)
+          echo "app bundle: $APP"
+          test -n "$APP"
+          mkdir -p ipa/Payload && cp -R "$APP" ipa/Payload/
+          (cd ipa && zip -qry ../SDOdesk-${{ env.VERSION }}-ios.ipa Payload)
+          ls -la SDOdesk-*.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SDOdesk-ios-ipa
+          path: SDOdesk-${{ env.VERSION }}-ios.ipa
+
+      - name: Publish ipa package
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        with:
+          prerelease: true
+          tag_name: ${{ env.TAG_NAME }}
+          files: |
+            SDOdesk-${{ env.VERSION }}-ios.ipa
 
       # - name: Upload Artifacts
       #   # if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
